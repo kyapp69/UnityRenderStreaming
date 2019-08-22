@@ -2,7 +2,7 @@ test_editors:
   - version: 2019.1
 test_platforms:
   - name: win
-    type: Unity::VM
+    type: Unity::VM::GPU
     image: package-ci/win10:stable
     flavor: b1.large
 packages:
