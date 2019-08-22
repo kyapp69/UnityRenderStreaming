@@ -7,13 +7,16 @@ test_platforms:
     flavor: b1.large
 packages:
   - name: webrtc
+    packagename: com.unity.webrtc
   - name: renderstreaming
+    packagename: com.unity.renderstreaming
 ---
 
+{% for package in packages %}
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
-promotion_test_{{ platform.name }}_{{ editor.version }}:
-  name : Promotion Test {{ editor.version }} on {{ platform.name }}
+promotion_test_{{ package.packagename }}_{{ platform.name }}_{{ editor.version }}:
+  name : Promotion Test {{ package.packagename }} {{ editor.version }} on {{ platform.name }}
   agent:
     type: {{ platform.type }}
     image: {{ platform.image }}
@@ -22,15 +25,13 @@ promotion_test_{{ platform.name }}_{{ editor.version }}:
     UPMCI_PROMOTION: 1
   commands:
     - npm install upm-ci-utils@stable -g --registry https://api.bintray.com/npm/unity/unity-npm
-    - upm-ci package test --unity-version {{ editor.version }}
+    - upm-ci package test --unity-version {{ editor.version }} --package-path Packages/{{ package.packagename }}
   artifacts:
     logs:
       paths:
         - "upm-ci~/test-results/**/*"
   dependencies:
-{% for package in packages %}
     - .yamato/upm-ci-renderstreaming-packages.yml#pack_{{ package.name }}
-{% endfor %}
 {% endfor %}
 {% endfor %}
 
@@ -50,7 +51,7 @@ promotion_test_trigger:
   dependencies:
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
-    - .yamato/promotion.yml#promotion_test_{{platform.name}}_{{editor.version}}
+    - .yamato/promotion.yml#promotion_test_{{ package.packagename }}_{{ platform.name }}_{{ editor.version }}
 {% endfor %}
 {% endfor %}
 
@@ -64,7 +65,7 @@ promote:
     UPMCI_PROMOTION: 1
   commands:
     - npm install upm-ci-utils@stable -g --registry https://api.bintray.com/npm/unity/unity-npm
-    - upm-ci package promote
+    - upm-ci package promote --package-path Packages/{{ package.packagename }}
   triggers:
     tags:
       only:
@@ -79,6 +80,7 @@ promote:
 {% endfor %}
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
-    - .yamato/promotion.yml#promotion_test_{{ platform.name }}_{{ editor.version }}
+    - .yamato/promotion.yml#promotion_test_{{ package.packagename }}_{{ platform.name }}_{{ editor.version }}
+{% endfor %}
 {% endfor %}
 {% endfor %}
