@@ -15,7 +15,7 @@ packages:
 {% for package in packages %}
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
-promotion_test_{{ package.packagename }}_{{ platform.name }}_{{ editor.version }}:
+promotion_test_{{ package.name }}_{{ platform.name }}_{{ editor.version }}:
   name : Promotion Test {{ package.packagename }} {{ editor.version }} on {{ platform.name }}
   agent:
     type: {{ platform.type }}
@@ -51,7 +51,7 @@ promotion_test_trigger:
   dependencies:
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
-    - .yamato/promotion.yml#promotion_test_{{ package.packagename }}_{{ platform.name }}_{{ editor.version }}
+    - .yamato/promotion.yml#promotion_test_{{ package.name }}_{{ platform.name }}_{{ editor.version }}
 {% endfor %}
 {% endfor %}
 
@@ -78,7 +78,7 @@ promote:
     - .yamato/upm-ci-renderstreaming-packages.yml#pack_{{ package.name }}
 {% for editor in test_editors %}
 {% for platform in test_platforms %}
-    - .yamato/promotion.yml#promotion_test_{{ package.packagename }}_{{ platform.name }}_{{ editor.version }}
+    - .yamato/promotion.yml#promotion_test_{{ package.name }}_{{ platform.name }}_{{ editor.version }}
 {% endfor %}
 {% endfor %}
 {% endfor %}
