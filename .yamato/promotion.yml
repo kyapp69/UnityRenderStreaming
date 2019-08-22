@@ -39,11 +39,10 @@ promotion_test_{{ package.name }}_{{ platform.name }}_{{ editor.version }}:
     - .yamato/upm-ci-renderstreaming-packages.yml#pack_{{ package.name }}
 {% endfor %}
 {% endfor %}
-{% endfor %}
 
 
-promote:
-  name: Promote to Production
+promote_{{ package.name }}:
+  name: Promote {{ package.name }} to Production
   agent:
     type: Unity::VM
     image: package-ci/win10:stable
@@ -68,3 +67,5 @@ promote:
     - .yamato/promotion.yml#promotion_test_{{ package.name }}_{{ platform.name }}_{{ editor.version }}
 {% endfor %}
 {% endfor %}
+
+{% endfor %} #packages
