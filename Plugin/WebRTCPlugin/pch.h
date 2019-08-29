@@ -59,6 +59,7 @@
 #include "media/base/videobroadcaster.h"
 #pragma endregion
 #include "d3d11.h"
+#include "d3d12.h"
 
 namespace WebRTC
 {
@@ -95,4 +96,5 @@ namespace WebRTC
     extern UnityFrameBuffer* renderTextures[bufferedFrameNum];
     extern ID3D11DeviceContext* context;
     extern ID3D11Device* g_D3D11Device;
+    extern ID3D12Device* g_D3D12Device;
 }

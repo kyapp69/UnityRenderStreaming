@@ -172,6 +172,7 @@
   <ItemGroup>
     <ClInclude Include="..\unity\include\IUnityGraphics.h" />
     <ClInclude Include="..\unity\include\IUnityGraphicsD3D11.h" />
+    <ClInclude Include="..\unity\include\IUnityGraphicsD3D12.h" />
     <ClInclude Include="..\unity\include\IUnityInterface.h" />
     <ClInclude Include="Context.h" />
     <ClInclude Include="DataChannelObject.h" />

@@ -2,16 +2,19 @@
 #include "Context.h"
 #include "IUnityGraphics.h"
 #include "IUnityGraphicsD3D11.h"
+#include "IUnityGraphicsD3D12.h"
 
 namespace WebRTC
 {
     IUnityInterfaces* s_UnityInterfaces = nullptr;
     IUnityGraphics* s_Graphics = nullptr;
-    UnityGfxRenderer s_RenderType;
     //d3d11 context
     ID3D11DeviceContext* context;
     //d3d11 device
     ID3D11Device* g_D3D11Device = nullptr;
+    //d3d12 device
+    ID3D12Device* g_D3D12Device = nullptr;
+
     //natively created ID3D11Texture2D ptrs
     UnityFrameBuffer* renderTextures[bufferedFrameNum];
 
@@ -25,13 +28,41 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     {
     case kUnityGfxDeviceEventInitialize:
     {
-        s_RenderType = s_UnityInterfaces->Get<IUnityGraphics>()->GetRenderer();
-        if (s_RenderType == kUnityGfxRendererD3D11)
+        auto* graphics = s_UnityInterfaces->Get<IUnityGraphics>();
+        switch (graphics->GetRenderer())
+        {
+        case kUnityGfxRendererD3D11:
         {
             g_D3D11Device = s_UnityInterfaces->Get<IUnityGraphicsD3D11>()->GetDevice();
             g_D3D11Device->GetImmediateContext(&context);
+            break;
         }
-        break;
+        case kUnityGfxRendererD3D12:
+        {
+            if (auto ifs = s_UnityInterfaces->Get<IUnityGraphicsD3D12v5>()) {
+                g_D3D12Device = ifs->GetDevice();
+            }
+            else if (auto ifs = s_UnityInterfaces->Get<IUnityGraphicsD3D12v4>()) {
+                g_D3D12Device = ifs->GetDevice();
+            }
+            else if (auto ifs = s_UnityInterfaces->Get<IUnityGraphicsD3D12v3>()) {
+                g_D3D12Device = ifs->GetDevice();
+            }
+            else if (auto ifs = s_UnityInterfaces->Get<IUnityGraphicsD3D12v2>()) {
+                g_D3D12Device = ifs->GetDevice();
+            }
+            else if (auto ifs = s_UnityInterfaces->Get<IUnityGraphicsD3D12>()) {
+                g_D3D12Device = ifs->GetDevice();
+            }
+            else
+            {
+                // unknown IUnityGraphicsD3D12 version
+                LogPrint("Unknown IUnityGraphicsD3D12 version\n");
+                return;
+            }
+            break;
+        }
+        };
     }
     case kUnityGfxDeviceEventShutdown:
     {
