@@ -1,24 +1,40 @@
 import Signaling from "./signaling.js"
 
 export class VideoPlayer {
-  constructor(element, config) {
+
+  constructor(elements, config) {
     const _this = this;
     this.cfg = VideoPlayer.getConfiguration(config);
     this.pc = null;
     this.channel = null;
+    this.UnityStreams = [];
+    this.UnityStreamCount = 2;
     this.offerOptions = {
       offerToReceiveAudio: true,
       offerToReceiveVideo: true,
     };
-    this.video = element;
-    this.video.playsInline = true;
-    this.video.addEventListener('loadedmetadata', function () {
-      _this.video.play();
-      _this.resizeVideo();
-    }, true);
+
+    this.videos = elements;
+    this.videos.forEach(v=>{
+      v.playsInline = true;
+      v.addEventListener('loadedmetadata', function () {
+        v.play();
+        _this.resizeVideo();
+      }, true);
+    })
+
+// TODO:: Fix "resizeVideo()" function to be able to use multiple videos
+//    this.video = element;
+//    this.video.playsInline = true;
+//    this.video.addEventListener('loadedmetadata', function () {
+//      _this.video.play();
+//      _this.resizeVideo();
+//    }, true);
+
     this.interval = 3000;
     this.signaling = new Signaling();
     this.ondisconnect = function(){};
+    this.onaddtrackfinish = function (mediaStreams) {};
     this.sleep = msec => new Promise(resolve => setTimeout(resolve, msec));
   }
 
@@ -28,6 +44,7 @@ export class VideoPlayer {
     }
     config.sdpSemantics = 'unified-plan';
     config.iceServers = [{urls: ['stun:stun.l.google.com:19302']}];
+    config.bundlePolicy = "max-bundle";
     return config;
   }
 
@@ -53,6 +70,13 @@ export class VideoPlayer {
 
     // Create peerConnection with proxy server and set up handlers
     this.pc = new RTCPeerConnection(this.cfg);
+
+    this.pc.addTransceiver("video");
+    this.pc.addTransceiver("audio");
+    this.pc.addTransceiver("video");
+    this.pc.addTransceiver("audio");
+
+
     this.pc.onsignalingstatechange = function (e) {
       console.log('signalingState changed:', e);
     };
@@ -66,10 +90,32 @@ export class VideoPlayer {
     this.pc.onicegatheringstatechange = function (e) {
       console.log('iceGatheringState changed:', e);
     };
+    let tempCount = 0;
     this.pc.ontrack = function (e) {
+
       console.log('New track added: ', e.streams);
-      _this.video.srcObject = e.streams[0];
+      console.log(e.track);
+
+      if (_this.UnityStreams.indexOf(e.streams[0])==-1)
+      {
+        _this.UnityStreams.push(e.streams[0]);
+        if ( _this.UnityStreamCount==_this.UnityStreams.length )
+        {
+          _this.onaddtrackfinish(_this.UnityStreams);
+        }
+      }
     };
+
+    _this.videos[0].onresize = function () {
+      console.log("video 0 width:=" + _this.videos[0].videoWidth);
+      console.log("video 0 height:=" + _this.videos[0].videoHeight);
+    }
+
+    _this.videos[1].onresize = function () {
+      console.log("video 1 width:=" + _this.videos[1].videoWidth);
+      console.log("video 1 height:=" + _this.videos[1].videoHeight);
+    }
+
     this.pc.onicecandidate = function (e) {
       if(e.candidate != null) {
         _this.signaling.sendCandidate(_this.sessionId, _this.connectionId, e.candidate.candidate, e.candidate.sdpMid, e.candidate.sdpMLineIndex);
@@ -97,6 +143,7 @@ export class VideoPlayer {
     await this.createConnection();
     // set local sdp
     offer.sdp = offer.sdp.replace(/useinbandfec=1/, 'useinbandfec=1;stereo=1;maxaveragebitrate=1048576');
+
     const desc = new RTCSessionDescription({sdp:offer.sdp, type:"offer"});
     await this.pc.setLocalDescription(desc);
     await this.sendOffer(offer);
@@ -129,6 +176,7 @@ export class VideoPlayer {
       if(answers.length > 0) {
         const answer = answers[0];
         await this.setAnswer(sessionId, answer.sdp);
+
       }
       await this.sleep(interval);
     }
@@ -197,6 +245,18 @@ export class VideoPlayer {
       this.pc.close();
       this.pc = null;
     }
+  };
+
+  selectMediaStream(streamId){
+
+    for (let i=0; i<this.UnityStreams.length; ++i)
+    {
+      if (streamId==this.UnityStreams[i].id)
+      {
+        this.videos[i].srcObject = this.UnityStreams[i];
+      }
+    }
+
   };
 
   sendMsg(msg) {

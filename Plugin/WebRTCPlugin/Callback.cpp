@@ -14,9 +14,9 @@ namespace WebRTC
     ID3D11Device* g_D3D11Device = nullptr;
     //natively created ID3D11Texture2D ptrs
     UnityFrameBuffer* renderTextures[bufferedFrameNum];
-
     Context* s_context;
 }
+
 using namespace WebRTC;
 //get d3d11 device
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType)
@@ -35,14 +35,6 @@ static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType ev
     }
     case kUnityGfxDeviceEventShutdown:
     {
-        for (auto rt : renderTextures)
-        {
-            if (rt)
-            {
-                rt->Release();
-                rt = nullptr;
-            }
-        }
         //UnityPluginUnload not called normally
         s_Graphics->UnregisterDeviceEventCallback(OnGraphicsDeviceEvent);
         break;

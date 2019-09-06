@@ -1,23 +1,22 @@
 ﻿#include "pch.h"
-#include "NvVideoCapturer.h"
+#include "UnityVideoCapturer.h"
 
 namespace WebRTC
 {
-    NvVideoCapturer::NvVideoCapturer()
+    UnityVideoCapturer::UnityVideoCapturer(UnityEncoder* pEncoder, int _width, int _height) : nvEncoder(pEncoder), width(_width), height(_height)
     {
         set_enable_video_adapter(false);
         SetSupportedFormats(std::vector<cricket::VideoFormat>(1, cricket::VideoFormat(width, height, cricket::VideoFormat::FpsToInterval(framerate), cricket::FOURCC_H264)));
     }
-    void NvVideoCapturer::EncodeVideoData()
+    void UnityVideoCapturer::EncodeVideoData()
     {
         if (captureStarted && !captureStopped)
         {
-            int curFrameNum = nvEncoder->GetCurrentFrameCount() % bufferedFrameNum;
-            context->CopyResource(renderTextures[curFrameNum], unityRT);
-            nvEncoder->EncodeFrame();
+            context->CopyResource((ID3D11Resource*)nvEncoder->getRenderTexture(), unityRT);
+            nvEncoder->EncodeFrame(width, height);
         }
     }
-    void NvVideoCapturer::CaptureFrame(std::vector<uint8>& data)
+    void UnityVideoCapturer::CaptureFrame(std::vector<uint8>& data)
     {
         rtc::scoped_refptr<FrameBuffer> buffer = new rtc::RefCountedObject<FrameBuffer>(width, height, data);
         int64 timestamp = rtc::TimeMillis();
@@ -25,23 +24,22 @@ namespace WebRTC
         videoFrame.set_ntp_time_ms(timestamp);
         OnFrame(videoFrame, width, height);
     }
-    void NvVideoCapturer::StartEncoder()
+    void UnityVideoCapturer::StartEncoder()
     {
         captureStarted = true;
         SetKeyFrame();
     }
-    void NvVideoCapturer::SetKeyFrame()
+    void UnityVideoCapturer::SetKeyFrame()
     {
         nvEncoder->SetIdrFrame();
     }
-    void NvVideoCapturer::SetRate(uint32 rate)
+    void UnityVideoCapturer::SetRate(uint32 rate)
     {
         nvEncoder->SetRate(rate);
     }
 
-    void NvVideoCapturer::InitializeEncoder(int32 width, int32 height)
+    void UnityVideoCapturer::InitializeEncoder()
     {
-        nvEncoder = std::make_unique<NvEncoder>(width, height);
-        nvEncoder->CaptureFrame.connect(this, &NvVideoCapturer::CaptureFrame);
+        nvEncoder->captureFrame.connect(this, &UnityVideoCapturer::CaptureFrame);
     }
 }

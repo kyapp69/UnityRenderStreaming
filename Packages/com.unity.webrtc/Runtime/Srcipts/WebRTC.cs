@@ -176,11 +176,19 @@ namespace Unity.WebRTC
         All
     }
 
+    public enum RTCBundlePolicy
+    {
+        kBundlePolicyBalanced,
+        kBundlePolicyMaxBundle,
+        kBundlePolicyMaxCompat
+    };
+
     [Serializable]
     public struct RTCConfiguration
     {
         public RTCIceServer[] iceServers;
         public RTCIceTransportPolicy iceTransportPolicy;
+        public RTCBundlePolicy bundle_policy;
     }
 
     public enum CodecInitializationResult
@@ -259,15 +267,16 @@ namespace Unity.WebRTC
             {
                 // Wait until all frame rendering is done
                 yield return new WaitForEndOfFrame();
-                if (CameraExtension.started)
+                //Blit is for DirectX Rendering API Only
+
+                foreach (var k in CameraExtension.camCapturerTexturesDict.Keys)
                 {
-                    //Blit is for DirectX Rendering API Only
-                    foreach(var rts in CameraExtension.camCopyRts)
+                    foreach (var rt in CameraExtension.camCapturerTexturesDict[k].webRTCTextures)
                     {
-                        Graphics.Blit(rts[0], rts[1], flipMat);
-                    }
-                    GL.IssuePluginEvent(s_renderCallback, 0);
+                        Graphics.Blit(CameraExtension.camCapturerTexturesDict[k].camRenderTexture, rt, flipMat);
+                    }    
                 }
+                GL.IssuePluginEvent(s_renderCallback, 0);
                 Audio.Update();
             }
         }
@@ -379,7 +388,7 @@ namespace Unity.WebRTC
         [DllImport(WebRTC.Lib)]
         public static extern void PeerConnectionSetRemoteDescription(IntPtr ptr, ref RTCSessionDescription desc);
         [DllImport(WebRTC.Lib)]
-        public static extern IntPtr PeerConnectionAddTrack(IntPtr pc, IntPtr track);
+        public static extern IntPtr PeerConnectionAddTrack(IntPtr pc, IntPtr track, [MarshalAs(UnmanagedType.LPStr, SizeConst = 256)] string mediaStreamId);
         [DllImport(WebRTC.Lib)]
         public static extern void PeerConnectionRemoveTrack(IntPtr pc, IntPtr sender);
         [DllImport(WebRTC.Lib)]
@@ -413,9 +422,11 @@ namespace Unity.WebRTC
         [DllImport(WebRTC.Lib)]
         public static extern void DataChannelRegisterOnClose(IntPtr ptr, DelegateOnClose callback);
         [DllImport(WebRTC.Lib)]
-        public static extern IntPtr CaptureVideoStream(IntPtr context, IntPtr rt, int width, int height);
+        public static extern IntPtr CreateMediaStream(IntPtr context, [MarshalAs(UnmanagedType.LPStr, SizeConst = 256)] string label);
         [DllImport(WebRTC.Lib)]
-        public static extern IntPtr CaptureAudioStream(IntPtr context);
+        public static extern IntPtr CreateVideoTrack(IntPtr context, [MarshalAs(UnmanagedType.LPStr, SizeConst = 256)] string label, IntPtr rt, int width, int height, int bitRate);
+        [DllImport(WebRTC.Lib)]
+        public static extern IntPtr CreateAudioTrack(IntPtr context, [MarshalAs(UnmanagedType.LPStr, SizeConst = 256)] string label);
         [DllImport(WebRTC.Lib)]
         public static extern void MediaStreamAddTrack(IntPtr stream, IntPtr track);
         [DllImport(WebRTC.Lib)]
@@ -453,8 +464,9 @@ namespace Unity.WebRTC
         public static Context Create(int uid = 0) { return NativeMethods.ContextCreate(uid); }
         public static CodecInitializationResult GetCodecInitializationResult() { return NativeMethods.GetCodecInitializationResult(); }
         public void Destroy(int uid = 0) { NativeMethods.ContextDestroy(uid); self = IntPtr.Zero; }
-        public IntPtr CaptureVideoStream(IntPtr rt, int width, int height) { return NativeMethods.CaptureVideoStream(self, rt, width, height); }
-        public IntPtr CaptureAudioStream() { return NativeMethods.CaptureAudioStream(self); }
+        public IntPtr CreateMediaStream(string label) { return NativeMethods.CreateMediaStream(self, label); }
+        public IntPtr CreateVideoTrack(string label, IntPtr rt, int width, int height, int bitRate) { return NativeMethods.CreateVideoTrack(self, label, rt, width, height, bitRate); }
+        public IntPtr CreateAudioTrack(string label) {return NativeMethods.CreateAudioTrack(self, label);}
         public IntPtr GetRenderEventFunc() { return NativeMethods.GetRenderEventFunc(self); }
         public void StopMediaStreamTrack(IntPtr track) { NativeMethods.StopMediaStreamTrack(self, track); }
     }

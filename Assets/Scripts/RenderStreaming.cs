@@ -18,6 +18,12 @@ namespace Unity.RenderStreaming
         public ButtonClickEvent click;
     }
 
+    class CameraMediaStream
+    {
+        public Camera camera;
+        public MediaStream[] mediaStreams = new MediaStream[2];
+    }
+
     public class RenderStreaming : MonoBehaviour
     {
 #pragma warning disable 0649
@@ -40,10 +46,11 @@ namespace Unity.RenderStreaming
         private float interval = 5.0f;
 
         [SerializeField, Tooltip("Camera to capture video stream")]
-        private Camera captureCamera;
+        private Camera[] captureCameras;
 
         [SerializeField, Tooltip("Array to set your own click event")]
         private ButtonClickElement[] arrayButtonClickEvent;
+
 #pragma warning restore 0649
 
         private Signaling signaling;
@@ -51,8 +58,7 @@ namespace Unity.RenderStreaming
         private Dictionary<RTCPeerConnection, Dictionary<int, RTCDataChannel>> mapChannels = new Dictionary<RTCPeerConnection, Dictionary<int, RTCDataChannel>>();
         private RTCConfiguration conf;
         private string sessionId;
-        private MediaStream videoStream;
-        private MediaStream audioStream;
+        private Dictionary<Camera, CameraMediaStream> cameraMediaStreamDict = new Dictionary<Camera, CameraMediaStream>();
 
         public void Awake()
         {
@@ -63,6 +69,7 @@ namespace Unity.RenderStreaming
 
         public void OnDestroy()
         {
+            Unity.WebRTC.Audio.Stop();
             WebRTC.WebRTC.Finalize();
             RemoteInput.Destroy();
         }
@@ -72,8 +79,24 @@ namespace Unity.RenderStreaming
             {
                 yield break;
             }
-            videoStream = captureCamera.CaptureStream(streamingSize.x, streamingSize.y);
-            audioStream = Unity.WebRTC.Audio.CaptureStream();
+            foreach (var camera in captureCameras)
+            {
+                var cameraMediaStream = new CameraMediaStream();
+                cameraMediaStreamDict.Add(camera, cameraMediaStream);
+                camera.CreateRenderStreamTexture(1280, 720);
+                int mediaCount = cameraMediaStream.mediaStreams.Length;
+                for (int i = 0; i < mediaCount; ++i)
+                {
+                    cameraMediaStream.mediaStreams[i] = new MediaStream();
+                    var rt = camera.GetStreamTexture(0);
+                    int temp = i==0 ? 1 : (int)Mathf.Pow(i + 1, 10);
+                    var videoTrack = new VideoStreamTrack("videoTrack" + i, rt, 1000000/temp);
+                    cameraMediaStream.mediaStreams[i].AddTrack(videoTrack);
+                    cameraMediaStream.mediaStreams[i].AddTrack(new AudioStreamTrack("audioTrack"));
+                }
+            }
+            Unity.WebRTC.Audio.Start();
+
             signaling = new Signaling(urlSignaling);
             var opCreate = signaling.Create();
             yield return opCreate;
@@ -87,6 +110,7 @@ namespace Unity.RenderStreaming
 
             conf = default;
             conf.iceServers = iceServers;
+            conf.bundle_policy = RTCBundlePolicy.kBundlePolicyMaxBundle;
             StartCoroutine(WebRTC.WebRTC.Update());
             StartCoroutine(LoopPolling());
         }
@@ -135,30 +159,33 @@ namespace Unity.RenderStreaming
                 {
                     continue;
                 }
-                var pc = new RTCPeerConnection();
-                pcs.Add(offer.connectionId, pc);
 
+                var pc = new RTCPeerConnection(ref conf);
+                pcs.Add(offer.connectionId, pc);
                 pc.OnDataChannel = new DelegateOnDataChannel(channel => { OnDataChannel(pc, channel); });
-                pc.SetConfiguration(ref conf);
                 pc.OnIceCandidate = new DelegateOnIceCandidate(candidate => { StartCoroutine(OnIceCandidate(offer.connectionId, candidate)); });
                 pc.OnIceConnectionChange = new DelegateOnIceConnectionChange(state =>
                 {
                     if(state == RTCIceConnectionState.Disconnected)
                     {
-                        pc.Close();  
+                        pc.Close();
+                        pcs.Remove(offer.connectionId);
                     }
                 });
+
                 //make video bit rate starts at 16000kbits, and 160000kbits at max.
                 string pattern = @"(a=fmtp:\d+ .*level-asymmetry-allowed=.*)\r\n";
                 _desc.sdp = Regex.Replace(_desc.sdp, pattern, "$1;x-google-start-bitrate=16000;x-google-max-bitrate=160000\r\n");
                 pc.SetRemoteDescription(ref _desc);
-                foreach (var track in videoStream.GetTracks())
+                foreach (var k in cameraMediaStreamDict.Keys)
                 {
-                    pc.AddTrack(track);
-                }
-                foreach(var track in audioStream.GetTracks())
-                {
-                    pc.AddTrack(track);
+                    foreach (var mediaStream in cameraMediaStreamDict[k].mediaStreams)
+                    {
+                        foreach (var track in mediaStream.GetTracks())
+                        {
+                            pc.AddTrack(track, mediaStream.Id);
+                        }
+                    }
                 }
                 StartCoroutine(Answer(connectionId));
             }
@@ -182,7 +209,7 @@ namespace Unity.RenderStreaming
                 Debug.LogError($"Network Error: {opLocalDesc.error}");
                 yield break;
             }
-            var op3 = signaling.PostAnswer(this.sessionId, connectionId, op.desc.sdp); 
+            var op3 = signaling.PostAnswer(this.sessionId, connectionId, op.desc.sdp);
             yield return op3;
             if (op3.webRequest.isNetworkError)
             {
@@ -216,6 +243,7 @@ namespace Unity.RenderStreaming
                 {
                     continue;
                 }
+
                 foreach (var candidate in candidateContainer.candidates)
                 {
                     RTCIceCandidate _candidate = default;
