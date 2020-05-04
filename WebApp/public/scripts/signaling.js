@@ -1,6 +1,6 @@
 export default class Signaling {
   headers(sessionId) {
-    if(sessionId != undefined)
+    if(sessionId !== undefined)
     {
       return {'Content-Type': 'application/json', 'Session-Id': sessionId};
     }
@@ -10,7 +10,7 @@ export default class Signaling {
   };
 
   url(method) {
-    return location.protocol + '//' + location.host + '/signaling/' + method;
+    return location.protocol + '//' + location.host + location.pathname + 'signaling/' + method;
   };
   async createConnection(sessionId) {
     return await fetch(this.url('connection'), {method: 'PUT', headers: this.headers(sessionId)});
